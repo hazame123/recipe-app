@@ -5,6 +5,7 @@ import { User } from 'src/users/user.entity';
 import { Repository, QueryBuilder, Like } from 'typeorm';
 import { CreateRecipeDto } from './dto/create-recipe.dto';
 import { UpdateRecipeDto } from './dto/update-recipe.dto';
+import { getSynonyms } from 'src/utils/openai';
 
 @Injectable()
 export class RecipesService {
@@ -85,11 +86,43 @@ export class RecipesService {
   }
 
   async searchRecipes(query: string) {
-    return this.recipeRepository
-      .createQueryBuilder('recipe')
-      .where('recipe.title ILIKE :query', { query: `%${query}%` }) // Case-insensitive search in PostgreSQL
-      .orWhere("recipe.ingredients::text ILIKE :query", { query: `%${query}%` }) // Search within JSON field
-      .getMany();
+    console.log('Search query:', query);  // Log the search query
+    
+    const synonyms = await getSynonyms(query);
+    console.log('Synonyms:', synonyms);  // Log the synonyms
+    
+    const searchTerms = [query, ...synonyms].filter((synonym => synonym !== ''));
+    console.log('Search Terms:', searchTerms);  // Log the search terms
+    
+    // Initialize query builder
+    const queryBuilder = this.recipeRepository.createQueryBuilder('recipe');
+    
+    // Use the first term for where condition and subsequent terms for orWhere conditions
+    searchTerms.forEach((term, index) => {
+      // Use unique parameter names like :term_0, :term_1, etc.
+      const paramName = `term_${index}`;
+      
+      if (index === 0) {
+        // First search term, apply the where clause
+        queryBuilder.where('recipe.title ILIKE :term_0', { [paramName]: `%${term}%` })
+                    .orWhere('recipe.ingredients::text ILIKE :term_0', { [paramName]: `%${term}%` });
+      } else {
+        // Subsequent terms, apply them as OR conditions
+        queryBuilder.orWhere('recipe.title ILIKE :term_' + index, { [`term_${index}`]: `%${term}%` })
+                    .orWhere('recipe.ingredients::text ILIKE :term_' + index, { [`term_${index}`]: `%${term}%` });
+      }
+    });
+
+    console.log('SQL Query:', queryBuilder.getQuery());
+    
+    const result = await queryBuilder.getMany();
+    
+    console.log('Result:', result);  // Log results
+    return result;
+  }
+
+  async aiSynonyms(query: string) {
+    return await getSynonyms(query);
   }
 
   async remove(recipeId: string, userId: string) {

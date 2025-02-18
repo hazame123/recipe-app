@@ -47,12 +47,11 @@ export class RecipesController {
   }
 
   // AI Synonyms
-  // @HttpCode(HttpStatus.OK)
-  // @Get('synonyms/:keyword')
-  // async aiSynonyms(@Param('keyword') keyword: string) {
-  //   const aiSynonyms = await getSynonyms(keyword);
-  //   return aiSynonyms;
-  // }
+  @HttpCode(HttpStatus.OK)
+  @Get('synonyms/:keyword')
+  async aiSynonyms(@Param('keyword') keyword: string) {
+    return this.recipesService.aiSynonyms(keyword);
+  }
 
   // Get recipe by ID
   @HttpCode(HttpStatus.FOUND)
